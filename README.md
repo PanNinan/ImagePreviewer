@@ -1,7 +1,7 @@
 # ImagePreviewer - 本地图片预览器
 
-[![CI](https://github.com/PanNinan/ImagePreviewer/actions/workflows/ci.yml/badge.svg)](https://github.com/YOUR_USERNAME/YOUR_REPO/actions/workflows/ci.yml)
-[![Build & Release](https://github.com/PanNinan/ImagePreviewer/actions/workflows/build-release.yml/badge.svg)](https://github.com/YOUR_USERNAME/YOUR_REPO/actions/workflows/build-release.yml)
+[![CI](https://github.com/PanNinan/ImagePreviewer/actions/workflows/ci.yml/badge.svg)](https://github.com/PanNinan/ImagePreviewer/actions/workflows/ci.yml)
+[![Build & Release](https://github.com/PanNinan/ImagePreviewer/actions/workflows/build-release.yml/badge.svg)](https://github.com/PanNinan/ImagePreviewer/actions/workflows/build-release.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 > 一个简洁高效的本地图片预览工具，支持缩略图浏览和大图预览。
@@ -26,7 +26,7 @@
 
 ### 方式一：直接下载可执行文件（推荐）
 
-访问 [Releases](https://github.com/YOUR_USERNAME/YOUR_REPO/releases) 页面，下载最新版本的 `ImagePreviewer.exe`：
+访问 [Releases](https://github.com/PanNinan/ImagePreviewer/releases) 页面，下载最新版本的 `ImagePreviewer.exe`：
 
 | 版本 | 说明 |
 |------|------|
