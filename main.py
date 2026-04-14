@@ -23,6 +23,8 @@ class ImagePreviewer(QMainWindow):
         self.resize(1200, 750)
         self.image_paths = []
         self.current_index = -1
+        self._thumbnail_thread = None  # 跟踪缩略图加载线程
+        self._is_running = True  # 用于线程安全退出
 
         # 设置配置存储
         self.settings = QSettings("ImagePreviewer", "App")
@@ -90,6 +92,13 @@ class ImagePreviewer(QMainWindow):
         clear_cache_action = tool_menu.addAction("清除缩略图缓存(&C)")
         clear_cache_action.triggered.connect(self.clear_thumbnail_cache)
 
+    def closeEvent(self, event):
+        """窗口关闭时优雅终止后台线程"""
+        self._is_running = False
+        if self._thumbnail_thread and self._thumbnail_thread.is_alive():
+            self._thumbnail_thread.join(timeout=2.0)  # 等待最多2秒
+        event.accept()
+
     def select_folder(self):
         folder = QFileDialog.getExistingDirectory(self, "选择图片文件夹")
         if folder:
@@ -132,31 +141,50 @@ class ImagePreviewer(QMainWindow):
                 item = QListWidgetItem()
                 item.setSizeHint(QSize(190, 190))
                 self.thumbnail_list.addItem(item)
-            threading.Thread(target=self._load_thumbnails_async, args=(folder,), daemon=True).start()
+            self._thumbnail_thread = threading.Thread(
+                target=self._load_thumbnails_async, args=(folder,), daemon=True
+            )
+            self._thumbnail_thread.start()
 
     def _load_thumbnails_async(self, folder):
         total = len(self.image_paths)
         for i, path in enumerate(self.image_paths):
+            # 检查是否仍在运行（窗口关闭时退出）
+            if not self._is_running:
+                break
+
             thumb_path = generate_thumbnail(path)
-            if thumb_path:
+            if thumb_path and self._is_running:
+                try:
+                    QMetaObject.invokeMethod(
+                        self,
+                        "_update_thumbnail_item",
+                        Qt.ConnectionType.QueuedConnection,
+                        Q_ARG(int, i),
+                        Q_ARG(str, thumb_path)
+                    )
+                except RuntimeError:
+                    # 对象已销毁，安全退出
+                    break
+
+            # 微小延迟避免阻塞
+            if i % 50 == 0 and self._is_running:
+                try:
+                    self.status_bar.showMessage(f"已处理 {i}/{len(self.image_paths)} 张...")
+                except RuntimeError:
+                    break
+
+        # 全部完成后通知（仅在仍在运行时）
+        if self._is_running:
+            try:
                 QMetaObject.invokeMethod(
                     self,
-                    "_update_thumbnail_item",
+                    "_on_thumbnails_loaded",
                     Qt.ConnectionType.QueuedConnection,
-                    Q_ARG(int, i),
-                    Q_ARG(str, thumb_path)
+                    Q_ARG(int, total)
                 )
-            # 微小延迟避免阻塞
-            if i % 50 == 0:
-                self.status_bar.showMessage(f"已处理 {i}/{len(self.image_paths)} 张...")
-
-        # 全部完成后通知
-        QMetaObject.invokeMethod(
-            self,
-            "_on_thumbnails_loaded",
-            Qt.ConnectionType.QueuedConnection,
-            Q_ARG(int, total)
-        )
+            except RuntimeError:
+                pass
 
     @pyqtSlot(int, str)
     def _update_thumbnail_item(self, index: int, thumb_path: str):

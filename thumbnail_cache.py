@@ -5,7 +5,7 @@ import shutil
 from PIL import Image
 from PyQt6.QtWidgets import QMessageBox
 
-CACHE_DIR = os.path.expanduser("～/.image_previewer_cache")
+CACHE_DIR = os.path.expanduser("~/.image_previewer_cache")
 THUMB_SIZE = (180, 180)  # 固定的缩略图尺寸
 
 def get_cache_path(image_path: str, size=(180, 180)):

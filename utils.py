@@ -10,6 +10,9 @@ def get_image_paths(folder_path: str):
     image_paths = []
     for root, _, files in os.walk(folder_path):
         for file in files:
+            # 过滤 macOS 元数据文件（._开头）和其他隐藏文件
+            if file.startswith('.') or file.startswith('._'):
+                continue
             if Path(file).suffix.lower() in SUPPORTED_FORMATS:
                 image_paths.append(os.path.join(root, file))
     return sorted(image_paths)
