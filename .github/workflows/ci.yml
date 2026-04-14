@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+    branches: [main, master, develop]
+
+jobs:
+  lint-and-test:
+    name: Lint & Test
+    runs-on: windows-latest
+
+    steps:
+      # ── 检出代码 ──────────────────────────────────────────────────────────
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      # ── Python 环境 ───────────────────────────────────────────────────────
+      - name: 设置 Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      # ── 安装依赖 ──────────────────────────────────────────────────────────
+      - name: 安装依赖
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # ── 代码语法检查 ─────────────────────────────────────────────────────
+      - name: Python 语法检查
+        run: |
+          python -m py_compile main.py
+          python -m py_compile thumbnail_cache.py
+          python -m py_compile utils.py
+          Write-Host "✅ 语法检查通过"
+        shell: pwsh
+
+      # ── Flake8 代码风格检查 ──────────────────────────────────────────────
+      - name: Flake8 风格检查
+        run: |
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=120 --statistics
+        continue-on-error: true
+
+      # ── Pylint 静态分析 ──────────────────────────────────────────────────
+      - name: Pylint 代码质量分析
+        run: |
+          pylint main.py thumbnail_cache.py utils.py --exit-zero
+        continue-on-error: true

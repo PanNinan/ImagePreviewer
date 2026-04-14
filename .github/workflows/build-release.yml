@@ -1,0 +1,118 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"         # 推送语义化版本 tag 时自动触发，如 v1.2.0
+  workflow_dispatch:     # 支持在 Actions 页面手动触发
+    inputs:
+      version:
+        description: "手动指定版本号（如 v1.0.0-beta），留空则使用 git tag"
+        required: false
+        default: ""
+
+permissions:
+  contents: write        # 允许创建 Release
+
+jobs:
+  build-windows:
+    name: Windows 打包 (PyInstaller)
+    runs-on: windows-latest
+
+    steps:
+      # ── 检出代码 ──────────────────────────────────────────────────────────
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      # ── Python 环境 ───────────────────────────────────────────────────────
+      - name: 设置 Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      # ── 安装依赖 ──────────────────────────────────────────────────────────
+      - name: 安装依赖
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # ── PyInstaller 打包 ──────────────────────────────────────────────────
+      - name: PyInstaller 打包
+        run: |
+          pyinstaller --noconfirm --onefile --windowed `
+            --name ImagePreviewer `
+            --icon="favicon.ico" `
+            --clean `
+            main.py
+        shell: pwsh
+
+      # ── 验证产物 ─────────────────────────────────────────────────────────
+      - name: 验证 EXE 产物
+        shell: pwsh
+        run: |
+          if (Test-Path "dist/ImagePreviewer.exe") {
+            $size = (Get-Item "dist/ImagePreviewer.exe").Length / 1MB
+            Write-Host "✅ 打包成功：dist/ImagePreviewer.exe ($([math]::Round($size, 1)) MB)"
+          } else {
+            Write-Host "❌ 打包失败，未找到 dist/ImagePreviewer.exe"
+            exit 1
+          }
+
+      # ── 确定版本号 ────────────────────────────────────────────────────────
+      - name: 确定版本号
+        id: version
+        shell: pwsh
+        run: |
+          if ("${{ github.event.inputs.version }}" -ne "") {
+            $ver = "${{ github.event.inputs.version }}"
+          } elseif ("${{ github.ref_type }}" -eq "tag") {
+            $ver = "${{ github.ref_name }}"
+          } else {
+            $ver = "dev-$(git rev-parse --short HEAD)"
+          }
+          echo "VERSION=$ver" >> $env:GITHUB_OUTPUT
+          Write-Host "版本号: $ver"
+
+      # ── 上传 Artifacts（供调试下载，保留 30 天）────────────────────────
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: ImagePreviewer-${{ steps.version.outputs.VERSION }}-windows
+          path: dist/ImagePreviewer.exe
+          retention-days: 30
+
+      # ── 创建 GitHub Release（仅 tag 触发时执行）─────────────────────────
+      - name: 创建 GitHub Release
+        if: github.ref_type == 'tag' || github.event.inputs.version != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.VERSION }}
+          name: "ImagePreviewer ${{ steps.version.outputs.VERSION }}"
+          body: |
+            ## ImagePreviewer ${{ steps.version.outputs.VERSION }}
+
+            ### 下载说明
+            - **`ImagePreviewer.exe`** — Windows 单文件可执行程序，无需安装 Python
+
+            ### 快速使用
+            1. 下载 `ImagePreviewer.exe`
+            2. 双击运行，选择图片文件夹即可开始浏览
+
+            ### 功能特性
+            - 📁 文件夹浏览，自动扫描图片
+            - 🔍 缩略图预览，异步加载
+            - 🖼️ 大图浏览，支持方向键切换
+            - 💾 智能缓存，下次秒速打开
+
+            ### 系统要求
+            - Windows 10/11
+            - 无需额外安装 Python 或任何依赖
+
+            ---
+            > ⚠️ **提示**：首次打开图片较多的文件夹时，缩略图生成需要一些时间，请耐心等待。
+          files: dist/ImagePreviewer.exe
+          draft: false
+          prerelease: ${{ contains(steps.version.outputs.VERSION, 'beta') || contains(steps.version.outputs.VERSION, 'alpha') || contains(steps.version.outputs.VERSION, 'rc') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
